@@ -135,7 +135,7 @@ __global__ void kernel_grid(
     }
 
     const uint32_t hashmap_size = offsets[level + 1] - offsets[level];
-    const float scale = exp2f(level * S) * H - 1.0f;
+    const float scale = floorf(exp2f(level * S) * H) - 1.0f;
     const uint32_t resolution = (uint32_t)ceil(scale) + 1;
     
     // calculate coordinate (always use float for precision!)
@@ -266,7 +266,7 @@ __global__ void kernel_grid_backward(
     grad += level * B * C + b * C + ch; // L, B, C
 
     const uint32_t hashmap_size = offsets[level + 1] - offsets[level];
-    const float scale = exp2f(level * S) * H - 1.0f;
+    const float scale = floorf(exp2f(level * S) * H) - 1.0f;
     const uint32_t resolution = (uint32_t)ceil(scale) + 1;
 
     // check input range (should be in [0, 1])
@@ -535,7 +535,7 @@ __global__ void kernel_grad_tv(
     if (flag_oob) return;
 
     const uint32_t hashmap_size = offsets[level + 1] - offsets[level];
-    const float scale = exp2f(level * S) * H - 1.0f;
+    const float scale = floorf(exp2f(level * S) * H) - 1.0f;
     const uint32_t resolution = (uint32_t)ceil(scale) + 1;
     
     // calculate coordinate
