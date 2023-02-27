@@ -102,24 +102,23 @@ class NeRFNetwork(NeRFRenderer):
         h = x
         for l in range(self.num_layers):
             h = self.sigma_net[l](h)
-            if l != self.num_layers - 1:
-                h = F.relu(h, inplace=True)
+            h = F.relu(h, inplace=True)
 
         #sigma = F.relu(h[..., 0])
-        sigma = trunc_exp(h[..., 0])
+        sigma = h[..., 0]
         geo_feat = h[..., 1:]
 
         # color
         
         d = self.encoder_dir(d)
-        h = torch.cat([d, geo_feat], dim=-1)
+        h = torch.cat([geo_feat, d], dim=-1)
         for l in range(self.num_layers_color):
             h = self.color_net[l](h)
             if l != self.num_layers_color - 1:
                 h = F.relu(h, inplace=True)
         
         # sigmoid activation for rgb
-        color = torch.sigmoid(h)
+        color = torch.clip(h, -8, 8) * (1 / 16) + 0.5
 
         return sigma, color
 
@@ -130,11 +129,10 @@ class NeRFNetwork(NeRFRenderer):
         h = x
         for l in range(self.num_layers):
             h = self.sigma_net[l](h)
-            if l != self.num_layers - 1:
-                h = F.relu(h, inplace=True)
+            h = F.relu(h, inplace=True)
 
         #sigma = F.relu(h[..., 0])
-        sigma = trunc_exp(h[..., 0])
+        sigma = h[..., 0]
         geo_feat = h[..., 1:]
 
         return {
@@ -174,14 +172,14 @@ class NeRFNetwork(NeRFRenderer):
             geo_feat = geo_feat[mask]
 
         d = self.encoder_dir(d)
-        h = torch.cat([d, geo_feat], dim=-1)
+        h = torch.cat([geo_feat, d], dim=-1)
         for l in range(self.num_layers_color):
             h = self.color_net[l](h)
             if l != self.num_layers_color - 1:
                 h = F.relu(h, inplace=True)
         
         # sigmoid activation for rgb
-        h = torch.sigmoid(h)
+        h = torch.clip(h, -8, 8) * (1 / 16) + 0.5
 
         if mask is not None:
             rgbs[mask] = h.to(rgbs.dtype) # fp16 --> fp32
