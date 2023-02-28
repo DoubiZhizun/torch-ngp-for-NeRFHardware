@@ -378,13 +378,13 @@ class _compress_bitfield(Function):
     @custom_fwd(cast_inputs=torch.float32)
     def forward(ctx, bitfield, H):
 
-        N = H * H * H / 8
+        N = int(H * H * H / 8)
 
         bitfield_compressed = torch.empty(N, dtype=torch.uint8, device=bitfield.device)
 
-        _backend.compress_grid(bitfield, N, H, bitfield_compressed)
+        _backend.compress_bitfield(bitfield, N, H, bitfield_compressed)
 
         return bitfield_compressed
 
 
-compress_bitfiled = _compress_bitfield
+compress_bitfiled = _compress_bitfield.apply

@@ -9,6 +9,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("sph_from_ray", &sph_from_ray, "sph_from_ray (CUDA)");
     m.def("morton3D", &morton3D, "morton3D (CUDA)");
     m.def("morton3D_invert", &morton3D_invert, "morton3D_invert (CUDA)");
+    m.def("compress_bitfield", &compress_bitfield, "compress_bitfield (CUDA)");
     // train
     m.def("march_rays_train", &march_rays_train, "march_rays_train (CUDA)");
     m.def("composite_rays_train_forward", &composite_rays_train_forward, "composite_rays_train_forward (CUDA)");
