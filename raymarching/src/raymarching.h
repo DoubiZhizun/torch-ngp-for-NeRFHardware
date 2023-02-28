@@ -9,6 +9,8 @@ void sph_from_ray(const at::Tensor rays_o, const at::Tensor rays_d, const float 
 void morton3D(const at::Tensor coords, const uint32_t N, at::Tensor indices);
 void morton3D_invert(const at::Tensor indices, const uint32_t N, at::Tensor coords);
 void packbits(const at::Tensor grid, const uint32_t N, const float density_thresh, at::Tensor bitfield);
+void compress_bitfield(const at::Tensor bitfield, const uint32_t N, const uint32_t H, at::Tensor bitfield_compressed);
+//compress 128 x 128 x 128 bitfield into 32 x 32 x 32
 
 void march_rays_train(const at::Tensor rays_o, const at::Tensor rays_d, const at::Tensor grid, const float bound, const float dt_gamma, const uint32_t max_steps, const uint32_t N, const uint32_t C, const uint32_t H, const uint32_t M, const at::Tensor nears, const at::Tensor fars, at::Tensor xyzs, at::Tensor dirs, at::Tensor deltas, at::Tensor rays, at::Tensor counter, at::Tensor noises);
 void composite_rays_train_forward(const at::Tensor sigmas, const at::Tensor rgbs, const at::Tensor deltas, const at::Tensor rays, const uint32_t M, const uint32_t N, const float T_thresh, at::Tensor weights_sum, at::Tensor depth, at::Tensor image);

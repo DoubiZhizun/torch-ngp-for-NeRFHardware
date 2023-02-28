@@ -912,3 +912,37 @@ void composite_rays(const uint32_t n_alive, const uint32_t n_step, const float T
         kernel_composite_rays<<<div_round_up(n_alive, N_THREAD), N_THREAD>>>(n_alive, n_step, T_thresh, rays_alive.data_ptr<int>(), rays_t.data_ptr<scalar_t>(), sigmas.data_ptr<scalar_t>(), rgbs.data_ptr<scalar_t>(), deltas.data_ptr<scalar_t>(), weights.data_ptr<scalar_t>(), depth.data_ptr<scalar_t>(), image.data_ptr<scalar_t>());
     }));
 }
+
+
+// bitfield: uint8_t, [(H * 4) * (H * 4) * (H * 4) / 8]
+// N: int, H * H * H / 8
+// bitfield_compressed: uint8_t, [H * H * H / 8]
+__global__ void kernel_compress_bitfield(
+    const uint8_t * __restrict__ bitfield,
+    const uint32_t N,
+    const uint32_t H,
+    uint8_t * bitfield_compressed
+) {
+    // parallel per byte
+    const uint32_t n = threadIdx.x + blockIdx.x * blockDim.x;
+    if (n >= N) return;
+
+    uint32_t axis = n * 8;
+    uint32_t x = axis % H;
+    uint32_t y = (axis / H) % H;
+    uint32_t z = (axis / (H * H));
+
+    uint8_t bits = 0;
+
+    for (uint32_t i = 0; i < 8; i++) {
+        bits |= (*(((const uint64_t *)bitfield) + __morton3D(x + i, y, z)) != 0) ? ((uint8_t)1 << i) : 0;
+    }
+
+    bitfield_compressed[n] = bits;
+}
+
+void compress_bitfield(const at::Tensor bitfield, const uint32_t N, const uint32_t H, at::Tensor bitfield_compressed) {
+    static constexpr uint32_t N_THREAD = 128;
+
+    kernel_compress_bitfield<<<div_round_up(N, N_THREAD), N_THREAD>>>(bitfield.data_ptr<uint8_t>(), N, H, bitfield_compressed.data_ptr<uint8_t>());
+}
