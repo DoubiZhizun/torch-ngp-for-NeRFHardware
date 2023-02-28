@@ -457,7 +457,7 @@ __global__ void kernel_march_rays_train(
             dirs[1] = dy;
             dirs[2] = dz;
             t += dt;
-            deltas[0] = dt;
+            deltas[0] = dt * mip_rbound * 0.5;
             deltas[1] = t - last_t; // used to calc depth
             last_t = t;
             xyzs += 3;
@@ -780,7 +780,7 @@ __global__ void kernel_march_rays(
             dirs[2] = dz;
             // calc dt
             t += dt;
-            deltas[0] = dt;
+            deltas[0] = dt * mip_rbound * 0.5;
             deltas[1] = t - last_t; // used to calc depth
             last_t = t;
             // step
