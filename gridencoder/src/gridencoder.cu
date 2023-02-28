@@ -49,7 +49,7 @@ __device__ inline T smoothstep_derivative(T val) {
 
 template <uint32_t D>
 __device__ uint32_t fast_hash(const uint32_t pos_grid[D]) {
-    
+
     // coherent type of hashing
     constexpr uint32_t primes[7] = { 1u, 2654435761u, 805459861u, 3674653429u, 2097192037u, 1434869437u, 2165219737u };
 
@@ -86,10 +86,10 @@ __device__ uint32_t get_grid_index(const uint32_t gridtype, const bool align_cor
 
 template <typename scalar_t, uint32_t D, uint32_t C>
 __global__ void kernel_grid(
-    const float * __restrict__ inputs, 
-    const scalar_t * __restrict__ grid, 
-    const int * __restrict__ offsets, 
-    scalar_t * __restrict__ outputs, 
+    const float * __restrict__ inputs,
+    const scalar_t * __restrict__ grid,
+    const int * __restrict__ offsets,
+    scalar_t * __restrict__ outputs,
     const uint32_t B, const uint32_t L, const float S, const uint32_t H,
     scalar_t * __restrict__ dy_dx,
     const uint32_t gridtype,
@@ -97,11 +97,11 @@ __global__ void kernel_grid(
     const uint32_t interp
 ) {
     const uint32_t b = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
     if (b >= B) return;
 
     const uint32_t level = blockIdx.y;
-    
+
     // locate
     grid += (uint32_t)offsets[level] * C;
     inputs += b * D;
@@ -119,7 +119,7 @@ __global__ void kernel_grid(
     if (flag_oob) {
         #pragma unroll
         for (uint32_t ch = 0; ch < C; ch++) {
-            outputs[ch] = 0; 
+            outputs[ch] = 0;
         }
         if (dy_dx) {
             dy_dx += b * D * L * C + level * D * C; // B L D C
@@ -127,17 +127,17 @@ __global__ void kernel_grid(
             for (uint32_t d = 0; d < D; d++) {
                 #pragma unroll
                 for (uint32_t ch = 0; ch < C; ch++) {
-                    dy_dx[d * C + ch] = 0; 
-                }       
+                    dy_dx[d * C + ch] = 0;
+                }
             }
         }
         return;
     }
 
     const uint32_t hashmap_size = offsets[level + 1] - offsets[level];
-    const float scale = floorf(exp2f(level * S) * H) - 1.0f;
-    const uint32_t resolution = (uint32_t)ceil(scale) + 1;
-    
+    const uint32_t resolution = (uint32_t)ceil(exp2f(level * S) * H);
+    const float scale = resolution - 1;
+
     // calculate coordinate (always use float for precision!)
     float pos[D];
     float pos_deriv[D] = {1.0f}; // linear deriv is default to 1
@@ -185,12 +185,12 @@ __global__ void kernel_grid(
         }
 
         //printf("[b=%d, l=%d] int %d, idx %d, w %f, val %f\n", b, level, idx, index, w, grid[index]);
-    }    
+    }
 
     // writing to global memory (slow)
     #pragma unroll
     for (uint32_t ch = 0; ch < C; ch++) {
-        outputs[ch] = results[ch]; 
+        outputs[ch] = results[ch];
     }
 
     // prepare dy_dx
@@ -245,10 +245,10 @@ __global__ void kernel_grid(
 template <typename scalar_t, uint32_t D, uint32_t C, uint32_t N_C>
 __global__ void kernel_grid_backward(
     const scalar_t * __restrict__ grad,
-    const float * __restrict__ inputs, 
-    const scalar_t * __restrict__ grid, 
-    const int * __restrict__ offsets, 
-    scalar_t * __restrict__ grad_grid, 
+    const float * __restrict__ inputs,
+    const scalar_t * __restrict__ grid,
+    const int * __restrict__ offsets,
+    scalar_t * __restrict__ grad_grid,
     const uint32_t B, const uint32_t L, const float S, const uint32_t H,
     const uint32_t gridtype,
     const bool align_corners,
@@ -266,8 +266,8 @@ __global__ void kernel_grid_backward(
     grad += level * B * C + b * C + ch; // L, B, C
 
     const uint32_t hashmap_size = offsets[level + 1] - offsets[level];
-    const float scale = floorf(exp2f(level * S) * H) - 1.0f;
-    const uint32_t resolution = (uint32_t)ceil(scale) + 1;
+    const uint32_t resolution = (uint32_t)ceil(exp2f(level * S) * H);
+    const float scale = resolution - 1;
 
     // check input range (should be in [0, 1])
     #pragma unroll
@@ -333,15 +333,15 @@ __global__ void kernel_grid_backward(
                 atomicAdd(&grad_grid[index + c], w * grad_cur[c]);
             }
         }
-    }    
+    }
 }
 
 
 template <typename scalar_t, uint32_t D, uint32_t C>
 __global__ void kernel_input_backward(
     const scalar_t * __restrict__ grad,
-    const scalar_t * __restrict__ dy_dx,  
-    scalar_t * __restrict__ grad_inputs, 
+    const scalar_t * __restrict__ dy_dx,
+    scalar_t * __restrict__ grad_inputs,
     uint32_t B, uint32_t L
 ) {
     const uint32_t t = threadIdx.x + blockIdx.x * blockDim.x;
@@ -353,7 +353,7 @@ __global__ void kernel_input_backward(
     dy_dx += b * L * D * C;
 
     scalar_t result = 0;
-    
+
     # pragma unroll
     for (int l = 0; l < L; l++) {
         # pragma unroll
@@ -393,7 +393,7 @@ void grid_encode_forward_cuda(const float *inputs, const scalar_t *embeddings, c
         case 4: kernel_grid_wrapper<scalar_t, 4>(inputs, embeddings, offsets, outputs, B, C, L, S, H, dy_dx, gridtype, align_corners, interp); break;
         case 5: kernel_grid_wrapper<scalar_t, 5>(inputs, embeddings, offsets, outputs, B, C, L, S, H, dy_dx, gridtype, align_corners, interp); break;
         default: throw std::runtime_error{"GridEncoding: C must be 1, 2, 4, or 8."};
-    }   
+    }
 }
 
 template <typename scalar_t, uint32_t D>
@@ -402,19 +402,19 @@ void kernel_grid_backward_wrapper(const scalar_t *grad, const float *inputs, con
     const uint32_t N_C = std::min(2u, C); // n_features_per_thread
     const dim3 blocks_hashgrid = { div_round_up(B * C / N_C, N_THREAD), L, 1 };
     switch (C) {
-        case 1: 
-            kernel_grid_backward<scalar_t, D, 1, 1><<<blocks_hashgrid, N_THREAD>>>(grad, inputs, embeddings, offsets, grad_embeddings, B, L, S, H, gridtype, align_corners, interp); 
+        case 1:
+            kernel_grid_backward<scalar_t, D, 1, 1><<<blocks_hashgrid, N_THREAD>>>(grad, inputs, embeddings, offsets, grad_embeddings, B, L, S, H, gridtype, align_corners, interp);
             if (dy_dx) kernel_input_backward<scalar_t, D, 1><<<div_round_up(B * D, N_THREAD), N_THREAD>>>(grad, dy_dx, grad_inputs, B, L);
             break;
-        case 2: 
+        case 2:
             kernel_grid_backward<scalar_t, D, 2, 2><<<blocks_hashgrid, N_THREAD>>>(grad, inputs, embeddings, offsets, grad_embeddings, B, L, S, H, gridtype, align_corners, interp);
             if (dy_dx) kernel_input_backward<scalar_t, D, 2><<<div_round_up(B * D, N_THREAD), N_THREAD>>>(grad, dy_dx, grad_inputs, B, L);
             break;
-        case 4: 
+        case 4:
             kernel_grid_backward<scalar_t, D, 4, 2><<<blocks_hashgrid, N_THREAD>>>(grad, inputs, embeddings, offsets, grad_embeddings, B, L, S, H, gridtype, align_corners, interp);
             if (dy_dx) kernel_input_backward<scalar_t, D, 4><<<div_round_up(B * D, N_THREAD), N_THREAD>>>(grad, dy_dx, grad_inputs, B, L);
             break;
-        case 8: 
+        case 8:
             kernel_grid_backward<scalar_t, D, 8, 2><<<blocks_hashgrid, N_THREAD>>>(grad, inputs, embeddings, offsets, grad_embeddings, B, L, S, H, gridtype, align_corners, interp);
             if (dy_dx) kernel_input_backward<scalar_t, D, 8><<<div_round_up(B * D, N_THREAD), N_THREAD>>>(grad, dy_dx, grad_inputs, B, L);
             break;
@@ -448,7 +448,7 @@ void grid_encode_forward(const at::Tensor inputs, const at::Tensor embeddings, c
     CHECK_CUDA(offsets);
     CHECK_CUDA(outputs);
     // CHECK_CUDA(dy_dx);
-    
+
     CHECK_CONTIGUOUS(inputs);
     CHECK_CONTIGUOUS(embeddings);
     CHECK_CONTIGUOUS(offsets);
@@ -475,7 +475,7 @@ void grid_encode_backward(const at::Tensor grad, const at::Tensor inputs, const 
     CHECK_CUDA(grad_embeddings);
     // CHECK_CUDA(dy_dx);
     // CHECK_CUDA(grad_inputs);
-    
+
     CHECK_CONTIGUOUS(grad);
     CHECK_CONTIGUOUS(inputs);
     CHECK_CONTIGUOUS(embeddings);
@@ -496,27 +496,27 @@ void grid_encode_backward(const at::Tensor grad, const at::Tensor inputs, const 
     grad.scalar_type(), "grid_encode_backward", ([&] {
         grid_encode_backward_cuda<scalar_t>(grad.data_ptr<scalar_t>(), inputs.data_ptr<float>(), embeddings.data_ptr<scalar_t>(), offsets.data_ptr<int>(), grad_embeddings.data_ptr<scalar_t>(), B, D, C, L, S, H, dy_dx.has_value() ? dy_dx.value().data_ptr<scalar_t>() : nullptr, grad_inputs.has_value() ? grad_inputs.value().data_ptr<scalar_t>() : nullptr, gridtype, align_corners, interp);
     }));
-    
+
 }
 
 
 template <typename scalar_t, uint32_t D, uint32_t C>
 __global__ void kernel_grad_tv(
     const scalar_t * __restrict__ inputs,
-    const scalar_t * __restrict__ grid, 
-    scalar_t * __restrict__ grad, 
-    const int * __restrict__ offsets, 
+    const scalar_t * __restrict__ grid,
+    scalar_t * __restrict__ grad,
+    const int * __restrict__ offsets,
     const float weight,
     const uint32_t B, const uint32_t L, const float S, const uint32_t H,
     const uint32_t gridtype,
     const bool align_corners
 ) {
     const uint32_t b = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
     if (b >= B) return;
 
     const uint32_t level = blockIdx.y;
-    
+
     // locate
     inputs += b * D;
     grid += (uint32_t)offsets[level] * C;
@@ -535,9 +535,9 @@ __global__ void kernel_grad_tv(
     if (flag_oob) return;
 
     const uint32_t hashmap_size = offsets[level + 1] - offsets[level];
-    const float scale = floorf(exp2f(level * S) * H) - 1.0f;
-    const uint32_t resolution = (uint32_t)ceil(scale) + 1;
-    
+    const uint32_t resolution = (uint32_t)ceil(exp2f(level * S) * H);
+    const float scale = resolution - 1;
+
     // calculate coordinate
     float pos[D];
     uint32_t pos_grid[D]; // [0, resolution]
@@ -629,7 +629,7 @@ void grad_total_variation_cuda(const scalar_t *inputs, const scalar_t *embedding
         case 4: kernel_grad_tv_wrapper<scalar_t, 4>(inputs, embeddings, grad, offsets, weight, B, C, L, S, H, gridtype, align_corners); break;
         case 5: kernel_grad_tv_wrapper<scalar_t, 5>(inputs, embeddings, grad, offsets, weight, B, C, L, S, H, gridtype, align_corners); break;
         default: throw std::runtime_error{"GridEncoding: C must be 1, 2, 4, or 8."};
-    }   
+    }
 }
 
 
