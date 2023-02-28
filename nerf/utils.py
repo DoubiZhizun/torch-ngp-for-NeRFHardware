@@ -417,6 +417,7 @@ class Trainer(object):
 
             self.ckpt_path = os.path.join(self.workspace, 'checkpoints')
             self.best_path = f"{self.ckpt_path}/{self.name}.pth"
+            self.hardware_parameters_path = f"{self.ckpt_path}/{self.name}_hardware.dat"
             os.makedirs(self.ckpt_path, exist_ok=True)
             
         self.log(f'[INFO] Trainer: {self.name} | {self.time_stamp} | {self.device} | {"fp16" if self.fp16 else "fp32"} | {self.workspace}')
@@ -1071,6 +1072,7 @@ class Trainer(object):
                         self.ema.restore()
                     
                     torch.save(state, self.best_path)
+                    self.model.save_hardware_parameters(self.hardware_parameters_path)
             else:
                 self.log(f"[WARN] no evaluated results found, skip saving best checkpoint.")
             
