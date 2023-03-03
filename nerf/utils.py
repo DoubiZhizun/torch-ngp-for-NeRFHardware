@@ -586,14 +586,13 @@ class Trainer(object):
             gt_rgb = images
         
         outputs = self.model.render(rays_o, rays_d, staged=True, bg_color=bg_color, perturb=False, **vars(self.opt))
-        power = pynvml.nvmlDeviceGetPowerUsage(self.handle) / 1000
 
         pred_rgb = outputs['image'].reshape(B, H, W, 3)
         pred_depth = outputs['depth'].reshape(B, H, W)
 
         loss = self.criterion(pred_rgb, gt_rgb).mean()
 
-        return pred_rgb, pred_depth, gt_rgb, loss, power
+        return pred_rgb, pred_depth, gt_rgb, loss
 
     # moved out bg_color and perturb for more flexible control...
     def test_step(self, data, bg_color=None, perturb=False):  
@@ -606,11 +605,12 @@ class Trainer(object):
             bg_color = bg_color.to(self.device)
 
         outputs = self.model.render(rays_o, rays_d, staged=True, bg_color=bg_color, perturb=perturb, **vars(self.opt))
+        power = pynvml.nvmlDeviceGetPowerUsage(self.handle) / 1000
 
         pred_rgb = outputs['image'].reshape(-1, H, W, 3)
         pred_depth = outputs['depth'].reshape(-1, H, W)
 
-        return pred_rgb, pred_depth
+        return pred_rgb, pred_depth, power
 
 
     def save_mesh(self, save_path=None, resolution=256, threshold=10):
@@ -676,23 +676,29 @@ class Trainer(object):
         if name is None:
             name = f'{self.name}_ep{self.epoch:04d}'
 
+        total_power = 0
+
         os.makedirs(save_path, exist_ok=True)
         
         self.log(f"==> Start Test, save results to {save_path}")
 
-        pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+        pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]')
         self.model.eval()
 
         if write_video:
             all_preds = []
             all_preds_depth = []
+            
+        self.local_step = 0
 
         with torch.no_grad():
 
             for i, data in enumerate(loader):
+                self.local_step += 1
                 
                 with torch.cuda.amp.autocast(enabled=self.fp16):
-                    preds, preds_depth = self.test_step(data)
+                    preds, preds_depth, power = self.test_step(data)
+                    total_power += power
 
                 if self.opt.color_space == 'linear':
                     preds = linear_to_srgb(preds)
@@ -710,6 +716,7 @@ class Trainer(object):
                     cv2.imwrite(os.path.join(save_path, f'{name}_{i:04d}_rgb.png'), cv2.cvtColor(pred, cv2.COLOR_RGB2BGR))
                     cv2.imwrite(os.path.join(save_path, f'{name}_{i:04d}_depth.png'), pred_depth)
 
+                pbar.set_postfix(**{'power': f"{total_power / self.local_step:.2f}W"})
                 pbar.update(loader.batch_size)
         
         if write_video:
@@ -810,7 +817,7 @@ class Trainer(object):
         with torch.no_grad():
             with torch.cuda.amp.autocast(enabled=self.fp16):
                 # here spp is used as perturb random seed! (but not perturb the first sample)
-                preds, preds_depth = self.test_step(data, bg_color=bg_color, perturb=False if spp == 1 else spp)
+                preds, preds_depth, _ = self.test_step(data, bg_color=bg_color, perturb=False if spp == 1 else spp)
 
         if self.ema is not None:
             self.ema.restore()
@@ -925,7 +932,6 @@ class Trainer(object):
             name = f'{self.name}_ep{self.epoch:04d}'
 
         total_loss = 0
-        total_power = 0
         if self.local_rank == 0:
             for metric in self.metrics:
                 metric.clear()
@@ -937,7 +943,7 @@ class Trainer(object):
             self.ema.copy_to()
 
         if self.local_rank == 0:
-            pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]')
+            pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
 
         with torch.no_grad():
             self.local_step = 0
@@ -946,8 +952,7 @@ class Trainer(object):
                 self.local_step += 1
 
                 with torch.cuda.amp.autocast(enabled=self.fp16):
-                    preds, preds_depth, truths, loss, power = self.eval_step(data)
-                    total_power += power
+                    preds, preds_depth, truths, loss = self.eval_step(data)
 
                 # all_gather/reduce the statistics (NCCL only support all_*)
                 if self.world_size > 1:
@@ -994,7 +999,6 @@ class Trainer(object):
                     cv2.imwrite(save_path, cv2.cvtColor(pred, cv2.COLOR_RGB2BGR))
                     cv2.imwrite(save_path_depth, pred_depth)
 
-                    pbar.set_postfix(**{'power': f"{total_power / self.local_step:.2f}W"})
                     pbar.set_description(f"loss={loss_val:.4f} ({total_loss/self.local_step:.4f})")
                     pbar.update(loader.batch_size)
 

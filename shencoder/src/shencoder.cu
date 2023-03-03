@@ -62,7 +62,7 @@ __global__ void kernel_sh(
 		outputs[9] = y*(x2 - y2*(1.0f/3)) ;
 		outputs[10] = xyz ;
 		outputs[11] = y*(z2 - (1.0f/5)) ;
-		outputs[12] = (z2 - (3.0f/5)) ;
+		outputs[12] = z*(z2 - (3.0f/5)) ;
 		outputs[13] = x*(z2 - (1.0f/5)) ;
 		outputs[14] = z*(x2 - y2) ;
 		outputs[15] = x*(y2 - x2*(1.0f/3)) ;
