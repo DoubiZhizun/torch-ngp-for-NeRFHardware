@@ -69,16 +69,16 @@ __device__ uint32_t get_grid_index(const uint32_t gridtype, const bool align_cor
     uint32_t index = 0;
 
     #pragma unroll
-    for (uint32_t d = 0; d < D && stride <= hashmap_size; d++) {
+    for (uint32_t d = 0; d < D /*&& stride <= hashmap_size*/; d++) {
         index += pos_grid[d] * stride;
         stride *= align_corners ? resolution: (resolution + 1);
     }
 
     // NOTE: for NeRF, the hash is in fact not necessary. Check https://github.com/NVlabs/instant-ngp/issues/97.
     // gridtype: 0 == hash, 1 == tiled
-    if (gridtype == 0 && stride > hashmap_size) {
-        index = fast_hash<D>(pos_grid);
-    }
+//     if (gridtype == 0 && stride > hashmap_size) {
+//         index = fast_hash<D>(pos_grid);
+//     }
 
     return (index % hashmap_size) * C + ch;
 }

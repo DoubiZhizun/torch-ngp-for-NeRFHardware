@@ -9,7 +9,7 @@ dependencies:
   - trimesh
   - opencv
   - tensorboardX
-  - pytorch
+  - pytorch==1.11.0
   - numpy 
   - pandas
   - tqdm
@@ -17,6 +17,7 @@ dependencies:
   - rich
   - packaging
   - scipy
+  - pip
   - pip:
     - imageio
     - lpips
@@ -24,4 +25,3 @@ dependencies:
     - PyMCubes
     - pysdf
     - dearpygui
-    - git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
