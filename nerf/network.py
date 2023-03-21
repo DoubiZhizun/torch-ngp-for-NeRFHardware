@@ -34,7 +34,7 @@ class NeRFNetwork(NeRFRenderer):
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.geo_feat_dim = geo_feat_dim
-        self.encoder, self.in_dim = get_encoder(encoding, desired_resolution=1024)
+        self.encoder, self.in_dim = get_encoder(encoding)
 
         sigma_net = []
         for l in range(num_layers):
@@ -218,13 +218,13 @@ class NeRFNetwork(NeRFRenderer):
 
         with torch.no_grad():
 
-            grids = torch.clip(torch.round(self.encoder.embeddings * 1024).to(dtype = torch.int), -32768, 32767).view(-1).tolist()
+            grids = torch.clip(torch.round(self.encoder.embeddings * 8).to(dtype = torch.int), -256, 256).view(-1).tolist()
             offsets = self.encoder.offsets
 
             for i in range(len(offsets) - 1):
-                num = struct.pack('i', (offsets[i + 1] - offsets[i]) * 4 * 2)
+                num = struct.pack('i', (offsets[i + 1] - offsets[i]) * 2 * 2)
                 fid.write(num)
-                num = struct.pack(f'{(offsets[i + 1] - offsets[i]) * 4}h', *grids[4 * offsets[i]:4 * offsets[i + 1]])
+                num = struct.pack(f'{(offsets[i + 1] - offsets[i]) * 2}h', *grids[2 * offsets[i]:2 * offsets[i + 1]])
                 fid.write(num)
 
             weight_now = torch.flip(torch.transpose(torch.clip(torch.round(self.sigma_net[0].weight * 1024).to(dtype=torch.int), -32768, 32767), 1, 0), [0]).reshape(-1).tolist()
