@@ -108,11 +108,12 @@ class NeRFNetwork(NeRFRenderer):
         h = x
         for l in range(self.num_layers):
             h = self.sigma_net[l](h)
-            h = F.relu(h, inplace=True)
+            if l != self.num_layers - 1:
+                h = F.relu(h, inplace=True)
 
         #sigma = F.relu(h[..., 0])
-        sigma = h[..., 0]
-        geo_feat = h[..., 1:]
+        sigma = trunc_exp(h[..., 0])
+        geo_feat = F.relu(h[..., 1:])
 
         # color
 
@@ -135,11 +136,12 @@ class NeRFNetwork(NeRFRenderer):
         h = x
         for l in range(self.num_layers):
             h = self.sigma_net[l](h)
-            h = F.relu(h, inplace=True)
+            if l != self.num_layers - 1:
+                h = F.relu(h, inplace=True)
 
         #sigma = F.relu(h[..., 0])
-        sigma = h[..., 0]
-        geo_feat = h[..., 1:]
+        sigma = trunc_exp(h[..., 0])
+        geo_feat = F.relu(h[..., 1:])
 
         return {
             'sigma': sigma,
